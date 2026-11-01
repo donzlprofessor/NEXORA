@@ -1,159 +1,183 @@
 # NEXORA
 
-A local-first, full-stack business dashboard and read-only AI analyst built with Vue 3, TypeScript, Pinia, Tailwind CSS, Chart.js, FastAPI, SQLAlchemy, Alembic and PostgreSQL. Local Ollama `qwen3:4b` supplies optional inference without paid APIs.
+**A full-stack business dashboard for customer management, financial tracking and local AI analysis.**
 
-## Product modes
+[Live portfolio demo](https://nexora-portfolio-klo.pages.dev) · [GitHub repository](https://github.com/donzlprofessor/NEXORA)
 
-- **Local demo:** existing browser records and workflows continue to work without a database. Nothing is automatically imported.
-- **Authenticated account:** database-backed customer/finance CRUD, persistent preferences, server-derived AI metrics, session restoration and confirmed legacy-data import. Account records never overwrite browser demo storage.
-- **Public portfolio demo:** the isolated Vite `public-demo` mode needs no backend, account or paid API. It blocks account/inference calls and uses separate browser storage for fictional records. The full local application remains available with the normal commands below.
+NEXORA brings customer records, income, expenses and analytics into one responsive workspace. Built with Vue and TypeScript on the frontend and Python/FastAPI on the backend, it demonstrates authenticated CRUD, relational data modelling, multilingual interfaces and financial calculations independent of AI-generated explanations.
 
-Features include search, filters, sorting, pagination, responsive navigation, accessible dialogs, accurate financial/date metrics, JSON backups, separate customer lifetime spending, qualitative AI explanations and explicit data-completeness notices. Money is stored as integer cents in PostgreSQL; EUR remains the underlying currency.
+## Try the demo
 
-## Public portfolio demo (static Cloudflare Pages)
+Open the [live demo](https://nexora-portfolio-klo.pages.dev) and explore Dashboard, Analytics, Customers, Finance and Settings without registering. Edit fictional records, change the language, and refresh to see browser-local persistence.
 
-From `frontend`, with dependencies installed using `npm ci`:
+**This demo is for evaluation. Do not enter sensitive or real customer information.** Records stay in the current browser and origin, do not sync across devices, and can be lost when browser storage is cleared or unavailable. Settings provides JSON export/import for local backups.
 
-```powershell
-npm.cmd run dev:demo
-npm.cmd run build:demo
-npm.cmd run preview:demo
-```
+| | Public portfolio demo | Full local application |
+| --- | --- | --- |
+| Runtime | Static Vue application on Cloudflare Pages | Vue frontend, FastAPI backend and PostgreSQL |
+| Access | Immediate access; no registration | Registration and cookie-based account sessions |
+| Data | Fictional records; isolated browser storage | Account-owned customers, transactions and preferences in PostgreSQL |
+| AI Assistant | Local setup explanation; no model calls or simulated answers | Optional local Ollama for qualitative analysis; deterministic financial answers |
+| Branch | `portfolio-demo` includes both modes | `main` preserves the original full-stack version |
 
-`build:demo` checks TypeScript and writes **frontend/dist-demo**. Normal `npm run build` still writes **frontend/dist**; these outputs are separate. The new tracked `.env.public-demo` contains only public flags. Vite also forces public-demo network flags at configuration time, so a shell API URL cannot enable backend requests in this mode. Do not add credentials to any `VITE_*` variable: these are public bundle content.
+The normal frontend also supports unauthenticated browser records. Account imports require an explicit preview and confirmation; signing in does not automatically import or overwrite them.
 
-Visitors enter Dashboard immediately and can use Analytics, Customers, Finance and Settings without signing up. Fictional seed dates are relative to the first visit and then persisted. Seed customer spending matches linked income; after editing, lifetime spending remains an independently editable field, while financial charts use transaction records. Data and language/theme preferences persist only in the current browser/origin under `nexora_public_v1_*`. Existing full-mode browser keys are never imported or overwritten. Storage restrictions or quota failures can prevent persistence; the app reports storage errors. Export records from Settings for a portable backup. Avoid entering sensitive information on a public showcase.
+## Core features
 
-The localized demo banner explains this boundary in English, Polish and Russian. AI Assistant explains that live AI needs local FastAPI and Ollama (`qwen3:4b`); it does not generate simulated answers. The normal local AI integration is preserved.
+- **Dashboard and analytics:** all-time totals, date-based charts and selected-period reporting. Dashboard totals can differ from the Assistant's selected 7/30/90-day totals.
+- **Customer management:** create, edit and delete records; search, status filters, sorting and pagination.
+- **Finance:** income and expense CRUD, categories, date filters and net-profit calculations in EUR. Customer lifetime spending remains separate from transaction income.
+- **Accounts:** owner-scoped data access, session restoration, persisted preferences and confirmed JSON/browser-data imports.
+- **Local AI:** read-only qualitative analysis through Ollama `qwen3:4b`. Authenticated financial snapshots are calculated server-side in integer cents; supported exact-amount questions bypass inference. Generated explanations may still be wrong.
+- **Interface:** responsive layout, English/Polish/Russian translations, locale-aware formatting, theme preferences and keyboard-accessible dialogs.
 
-Cloudflare Pages settings (prepare only; this task does not deploy):
+## Technology stack
 
-| Setting | Value |
+| Layer | Technologies |
 | --- | --- |
-| Project type | Pages, static Vue/Vite site |
-| Root directory | `frontend` |
-| Build command | `npm run build:demo` |
-| Build output directory | `dist-demo` |
-| Branch, when explicitly authorized | `portfolio-demo` |
-| Node | A supported Node 24 LTS version, at least 24.12.0 |
-| Backend, database, bindings, API keys | None |
+| Frontend | Vue 3, TypeScript, Vite, Pinia, Vue Router |
+| UI and charts | Tailwind CSS, Chart.js / vue-chartjs, vue-i18n |
+| Backend | Python, FastAPI, Pydantic, SQLAlchemy, Alembic, psycopg |
+| Storage and authentication | PostgreSQL, Argon2 password hashing, HTTP-only session cookies, CSRF checks |
+| Optional inference | Local Ollama with `qwen3:4b`; no cloud AI fallback |
+| Quality and delivery | Vitest, Vue Test Utils, Python unittest, ESLint, Oxlint, GitHub Actions, Cloudflare Pages |
 
-Publish only `dist-demo`, never the repository or normal `dist`. `public/_redirects` is copied to the output and rewrites `/*` to `/index.html` with status 200 for Vue history routing. See Cloudflare's [build settings](https://developers.cloudflare.com/pages/configuration/build-configuration/) and [redirects](https://developers.cloudflare.com/pages/configuration/redirects/). Preview deep links such as `/customers` and `/settings` after hosting. Cloudflare deployment, domain configuration and browser/mobile acceptance still require manual verification.
+## Architecture
 
-For the full application use `npm run dev` / `npm run build` and the FastAPI, PostgreSQL and optional Ollama setup below. Do not set `VITE_PUBLIC_DEMO=true` in full-mode environment files or the shell. Existing environment files, migrations, Docker volumes and account data are untouched by the portfolio implementation.
+```text
+Public demo: Browser → Vue / Pinia → isolated localStorage
 
-## Verification status
+Full local:  Browser → Vue / Pinia → FastAPI → PostgreSQL
+                                      └──→ local Ollama (optional)
+```
 
-The existing backend virtual environment now includes the free database, migration, PostgreSQL driver and Argon2 dependencies. Account/authentication/authorization/import tests pass on isolated SQLite databases. The additive Alembic migration executes on SQLite and compiles PostgreSQL SQL offline. A live authenticated FastAPI-to-Ollama request succeeded with server-calculated figures.
+The frontend separates views, stores and HTTP/AI services. FastAPI validates requests and scopes database queries to the authenticated owner. PostgreSQL stores users, sessions, customers, transactions and preferences; Alembic manages the schema. Account snapshots aggregate monetary values before formatting them for display.
 
-**Docker and PostgreSQL tools are unavailable on the development machine. No local PostgreSQL migration/integration run or Docker image build has been completed.** GitHub Actions includes PostgreSQL migration and integration checks, but has not been pushed or run remotely. Real-browser acceptance remains outstanding. This is not a production-security claim.
+Public-demo mode blocks backend requests and uses a separate `nexora_public_v1_*` storage namespace. Normal account data is not written into browser demo storage. See [architecture and data boundaries](docs/ARCHITECTURE.md).
 
-## Windows setup
+## Screenshots
 
-Requirements: Node matching `frontend/package.json`, Python 3.11+, Docker Desktop with Compose (or a separately installed PostgreSQL), and optional local Ollama `qwen3:4b`. Run from `C:\Users\<username>\Projects\nexora` unless specified. Use separate terminals for services. `npm.cmd` avoids PowerShell execution-policy issues; virtual-environment activation is unnecessary.
+Screenshots are not yet included. The live demo is available for a walkthrough.
 
-### Configure environment without overwriting existing files
+<!-- TODO: Add a Dashboard screenshot using fictional records, then link to the actual relative file path. -->
+<!-- TODO: Add Customers, Finance and mobile-layout screenshots; never include private account data. -->
+
+## Run locally
+
+Use Node.js `^22.18.0` or `>=24.12.0` as specified in [package.json](frontend/package.json). The full application also needs Python 3.11+ and PostgreSQL; the supplied Compose service runs PostgreSQL 17. Ollama is optional. Commands below use Windows PowerShell; `npm.cmd` avoids execution-policy issues.
 
 ```powershell
-Set-Location "$env:USERPROFILE\Projects\nexora"
+git clone --branch portfolio-demo https://github.com/donzlprofessor/NEXORA.git
+cd NEXORA
+```
+
+### Frontend-only demo
+
+From a checkout of `portfolio-demo`:
+
+```powershell
+cd frontend
+npm.cmd ci
+npm.cmd run dev:demo
+```
+
+Open `http://127.0.0.1:5173`. No database, backend, environment-file setup or AI service is required. The tracked [.env.public-demo](frontend/.env.public-demo) contains public flags only.
+
+### Full application
+
+Start from the repository root. Create missing environment files without overwriting existing settings:
+
+```powershell
 if (-not (Test-Path .env)) { Copy-Item .env.example .env }
-if (-not (Test-Path backend\.env)) { Copy-Item backend\.env.example backend\.env }
-if (-not (Test-Path frontend\.env)) { Copy-Item frontend\.env.example frontend\.env }
+if (-not (Test-Path backend/.env)) { Copy-Item backend/.env.example backend/.env }
+if (-not (Test-Path frontend/.env)) { Copy-Item frontend/.env.example frontend/.env }
 ```
 
-Edit the ignored root `.env` and choose a unique `POSTGRES_PASSWORD`. Set the matching, URL-encoded password in `backend/.env`'s `DATABASE_URL`. Never commit these files. Keep `COOKIE_SECURE=false` only for local HTTP. The backend account runtime deliberately requires PostgreSQL; SQLite is used for isolated tests, not as a silent production fallback.
+Set a unique `POSTGRES_PASSWORD` in the root `.env` and the matching URL-encoded password in `backend/.env`'s `DATABASE_URL`. Keep `VITE_PUBLIC_DEMO=false` for normal mode. `COOKIE_SECURE=false` is for local HTTP only. Environment files must remain untracked; never put credentials in `VITE_*` variables, which are embedded in frontend bundles.
 
-To run browser-only demo mode without PostgreSQL, omit `DATABASE_URL` rather than pointing it at a nonexistent server. Database-backed login will then report unavailable, while existing browser workflows remain usable.
-
-### PostgreSQL and additive migration
-
-After installing Docker Desktop and configuring the environment:
+Start PostgreSQL, install backend dependencies and initialize the local schema:
 
 ```powershell
-Set-Location "$env:USERPROFILE\Projects\nexora"
 docker compose up -d db
-# First checkout only if the virtual environment is absent:
-py -3 -m venv backend\.venv
-.\backend\.venv\Scripts\python.exe -m pip install -r backend\requirements.lock.txt
-Set-Location backend
-.\.venv\Scripts\python.exe -m alembic upgrade head
-.\.venv\Scripts\python.exe -m alembic current
-.\.venv\Scripts\python.exe -m uvicorn main:app --host 127.0.0.1 --port 8000 --reload
+py -3 -m venv backend/.venv
+./backend/.venv/Scripts/python.exe -m pip install -r backend/requirements.lock.txt
+cd backend
+./.venv/Scripts/python.exe -m alembic upgrade head
+./.venv/Scripts/python.exe -m uvicorn main:app --host 127.0.0.1 --port 8000 --reload
 ```
 
-Compose exposes PostgreSQL only on `127.0.0.1:5432` and keeps data in a named volume. Do not run volume deletion or destructive downgrade commands. Alembic revision `0001` creates new account tables only; it never reads or modifies localStorage. Back up any existing account database before applying future revisions.
+Create the virtual environment only if absent. Apply migrations deliberately and back up existing databases first. Compose binds PostgreSQL to loopback and retains data in a named volume; do not delete volumes to restart the application. SQLite is used for isolated tests, not as an account-runtime fallback.
 
-### Ollama (optional, separate terminal)
-
-```powershell
-ollama list
-# Download once only if absent:
-ollama pull qwen3:4b
-ollama serve
-```
-
-Skip `ollama serve` if the tray app already runs it. Keep Ollama bound to loopback. `backend/.env.example` documents its endpoint, model and timeout. Native Windows FastAPI alongside Ollama is the supported local GPU arrangement; the optional backend Dockerfile is intended for deployments with inference disabled or separately reviewed local networking.
-
-### Frontend (separate terminal)
+In another terminal, from the repository root:
 
 ```powershell
-Set-Location "$env:USERPROFILE\Projects\nexora\frontend"
-# First checkout only; skip if already installed:
+cd frontend
 npm.cmd ci
 npm.cmd run dev
 ```
 
-Open `http://127.0.0.1:5173`. Use the same hostname as your existing records: `localhost` and `127.0.0.1` have different localStorage. Vite proxies `/api` to the local backend in development/preview. For a separately deployed frontend, set `VITE_API_BASE_URL` to the intended same-site HTTPS API or keep it empty behind a same-origin `/api` reverse proxy.
+Open `http://127.0.0.1:5173` and register a local account. Vite proxies `/api` to FastAPI on port 8000. Keep the browser hostname consistent: `localhost` and `127.0.0.1` have separate browser storage. Normal builds use `npm.cmd run build` and write `frontend/dist`.
 
-## Safe account migration and recovery
-
-Sign in, open **Account and migration**, preview existing localStorage or choose a NEXORA JSON backup, inspect conflicts, download/verify the source backup, and type **IMPORT ACCOUNT**. Nothing is written before confirmation. Import commits atomically, retains source IDs as owner-scoped migration references, skips identical repeats and rejects stale previews or changed/conflicting records. Database IDs may differ; no customer/transaction relationships are invented. Invalid historical dates/amounts need explicit correction in an exported copy, never in-place rewriting of the originals.
-
-All original browser keys remain unchanged after account hydration, mutation, import and sign-out. Export account data from Settings before major operations. A failed server import transaction rolls back; a network failure after commit can be reconciled with a fresh idempotent preview. A successful import is not automatically undone: use a verified database backup restored to a new empty database for recovery, or review individual imported records before deleting anything.
-
-Example PostgreSQL backup to a unique file (requires Docker):
+For optional local inference, install Ollama and run:
 
 ```powershell
-Set-Location "$env:USERPROFILE\Projects\nexora"
-New-Item -ItemType Directory -Force backups | Out-Null
-$backupName = 'nexora-' + (Get-Date -Format 'yyyyMMdd-HHmmss') + '.dump'
-docker compose exec -T db pg_dump -U nexora -d nexora --format=custom --file=/tmp/nexora-backup.dump
-docker compose cp db:/tmp/nexora-backup.dump "./backups/$backupName"
+ollama pull qwen3:4b
+ollama serve
 ```
 
-Verify the archive using `pg_restore --list`. Restore only into a newly created empty recovery database, point a separate backend at it, verify row counts/ownership/totals, and review the restored data before switching URLs. Never restore with destructive `--clean` options into the active database. Browser backups cannot restore forgotten account passwords or server sessions.
+Download the model only if absent; skip `ollama serve` if the Ollama app already runs. Keep inference bound to loopback. Endpoint, model and timeout settings are documented in [backend/.env.example](backend/.env.example). Numeric account answers require FastAPI and PostgreSQL, but do not require Ollama.
 
-## Checks
+## Tests and checks
+
+From `frontend`:
 
 ```powershell
-Set-Location "$env:USERPROFILE\Projects\nexora"
-.\backend\.venv\Scripts\python.exe -m unittest discover -s backend -p 'test_*.py'
-Set-Location frontend
-npm.cmd run type-check
 npm.cmd run test:unit -- --run
+npm.cmd run type-check
 npm.cmd run lint
 npm.cmd run build
+npm.cmd run build:demo
 ```
 
-Backend tests create isolated temporary SQLite databases; no user PostgreSQL or browser data is touched. CI separately applies Alembic to disposable PostgreSQL `nexora_ci` and reruns the account suite against that database. For an explicit local PostgreSQL test run, use only a separately provisioned `nexora_ci` database and set `NEXORA_TEST_POSTGRES_URL`; the harness refuses other database names and rolls back test transactions. Do not point test settings at personal data.
+Vitest uses jsdom and Vue Test Utils. Tests cover stores, financial/date calculations, account boundaries, translations, Assistant routing and public-demo isolation. The lint script applies automatic fixes, so review its diff.
 
-The opt-in `backend/smoke_ai.py` tests the local-demo gateway using synthetic data and live Ollama. In database mode use the authenticated Assistant page; `/api/chat` rejects client-authoritative totals. Account AI accepts questions/period/time zone only and calculates its context from the current user's rows.
+From `backend`, with dependencies installed, use process-local test settings so the development environment does not restrict the test host or select a personal database:
 
-## Architecture, security and release evidence
+```powershell
+$env:ALLOWED_HOSTS = 'localhost,127.0.0.1,testserver'
+$env:DATABASE_URL = ''
+$env:NEXORA_TEST_POSTGRES_URL = ''
+./.venv/Scripts/python.exe -m unittest discover -s . -p 'test_*.py'
+```
+
+Run this in a separate test terminal. The suite uses isolated SQLite databases and mocked inference; its migration test uses a temporary database. The [CI workflow](.github/workflows/ci.yml) additionally applies migrations and runs account integration tests against disposable PostgreSQL `nexora_ci`. It also defines frontend test, type, lint and normal-build checks. These describe configured checks, not the latest CI result. The [manual acceptance checklist](docs/ACCEPTANCE.md) covers browser and responsive verification.
+
+## Public demo deployment
+
+The live demo uses Cloudflare Pages and the `portfolio-demo` branch. Its configuration is separate from normal local mode:
+
+| Setting | Value |
+| --- | --- |
+| Branch | `portfolio-demo` |
+| Root directory | `frontend` |
+| Build command | `npm run build:demo` |
+| Output directory | `dist-demo` |
+| Node.js | Compatible with `package.json`; Node 24 LTS >=24.12.0 |
+| Backend, database or AI credentials | None |
+
+`build:demo` runs TypeScript checks and `vite build --mode public-demo --outDir dist-demo`. To preview locally, run `npm.cmd run build:demo` followed by `npm.cmd run preview:demo` from `frontend`. The [Vite configuration](frontend/vite.config.ts) disables demo API proxies and forces public-mode flags. [public/_redirects](frontend/public/_redirects) supplies the Vue Router history fallback (`/* /index.html 200`). Publish only the generated `dist-demo` directory.
+
+## Technical notes and limitations
+
+The full local application is a portfolio implementation, not a production-readiness or security certification claim. Public account hosting needs deployment-specific hardening. Email verification, password recovery, MFA and distributed rate limiting are not implemented. Large-account incremental loading and concurrent-edit protection remain future work.
+
+Before account import, export and verify a backup, review preview/conflicts, and confirm explicitly. Browser exports do not replace PostgreSQL backups or restore account credentials. Restore database backups into a separate recovery database rather than overwriting an active one.
 
 - [Architecture and data boundaries](docs/ARCHITECTURE.md)
 - [Security assumptions and limitations](docs/SECURITY.md)
-- [Browser acceptance checklist and screenshot guidance](docs/ACCEPTANCE.md)
-- [Phase 3 change inventory](docs/PHASE_3.md)
+- [Browser acceptance and screenshot guidance](docs/ACCEPTANCE.md)
+- [Public-demo implementation and verification notes](docs/PORTFOLIO_DEMO.md)
+- [Multilingual financial reporting and API notes](docs/PHASE_4.md)
+- [Account implementation history](docs/PHASE_3.md)
 
-Authentication uses Argon2, random opaque HTTP-only cookies, token hashes in PostgreSQL, per-session CSRF checks, Origin validation and owner-scoped queries. Sessions expire after twelve hours. Account API responses are not cacheable. Public hosting requires HTTPS, secure cookies, exact origins/hosts, private database networking and further abuse/security verification. No email verification, password reset, MFA or distributed rate limiter is included.
-
-AI remains read-only and local. It returns exact selected/previous-period metrics and expense-category totals separately from generated prose. The installed model's thinking-only behavior is handled with bounded generation/retry and hidden reasoning; no cloud fallback exists. Explanations may still be qualitatively wrong. Snapshot figures, not generated claims, are authoritative.
-
-Before public release: run the PostgreSQL CI job, complete browser/mobile/accessibility acceptance, test backups/recovery, review dependencies and deployment controls, and add concurrency protection/server-paginated loading for larger accounts. Do not label the application production-secure before those checks.
-
-## Phase 4: exact financial summaries and languages
-
-The app now provides English, Polish and Russian interfaces, persisted browser/account language preferences, locale-aware EUR/date formatting and multilingual local AI. Account summaries expose exact cent strings and remain visible if Ollama fails; explanations and evidence-based suggestions are displayed separately.
-
-See [Phase 4 delivery and verification](docs/PHASE_4.md) for the complete file inventory, API contract, test results, live Polish smoke-test limitation, exact Windows restart commands and manual browser checklist. No database schema migration is required for the additive language preference.
+Historical delivery notes record earlier verification conditions; they are not a live deployment-status report.
