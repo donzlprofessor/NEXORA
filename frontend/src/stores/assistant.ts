@@ -17,6 +17,16 @@ import { useCustomersStore } from './customers'
 import type { Period } from '@/utils/metrics'
 import { i18n } from '@/i18n'
 
+function asksForFinancialAmounts(text: string) {
+  const normalized = text.normalize('NFD').replace(/\p{M}/gu, '').replace(/ł/g, 'l').toLowerCase()
+  const explicit = /exact|figures|amounts|doklad|kwot|точн|сумм/.test(normalized)
+  const polishAmount =
+    /\b(?:ile|jakie)\s+(?:wynosza|wynosi|sa|jest)\b/.test(normalized) ||
+    /\b(?:ile mam|podaj|pokaz)\b/.test(normalized)
+  const financial = /przychod|wydatk|koszt|zysk|dochod/.test(normalized)
+  return explicit || (polishAmount && financial)
+}
+
 export const useAssistantStore = defineStore('assistant', () => {
   const messages = ref<ChatMessage[]>([])
   const recommendations = ref<string[]>([])
@@ -34,6 +44,20 @@ export const useAssistantStore = defineStore('assistant', () => {
   const period = ref<Period>('30D')
   const lastContext = ref<ReturnType<typeof businessContext> | null>(null)
   const serverSnapshot = ref<ServerSnapshot | null>(null)
+  const periodLabel = computed(() => {
+    const selected = lastContext.value?.selected
+    if (!selected) return ''
+    return i18n.global.t(
+      'assistant_selected_period',
+      {
+        days: Number.parseInt(selected.period, 10),
+        start: selected.start,
+        end: selected.end,
+        zone: serverSnapshot.value?.timezone ?? Intl.DateTimeFormat().resolvedOptions().timeZone,
+      },
+      { locale: language.value },
+    )
+  })
   let controller: AbortController | null = null
   function financialReply() {
     const selected = lastContext.value?.selected
@@ -48,7 +72,7 @@ export const useAssistantStore = defineStore('assistant', () => {
         ? preferencesStore.formatCurrencyCents(cents, locale)
         : new Intl.NumberFormat(locale, { style: 'currency', currency: 'EUR' }).format(amount)
     const lines = [
-      `${label('period_19016')}: ${selected.start} — ${selected.end} (EUR)`,
+      `${periodLabel.value} (EUR)`,
       `${label('revenue_54358')}: ${money(exact?.revenueCents, selected.totalIncome)}`,
       `${label('expenses_13495')}: ${money(exact?.expenseCents, selected.totalExpenses)}`,
       `${label('net_profit_43d72')}: ${money(exact?.netProfitCents, selected.netProfit)}`,
@@ -79,6 +103,7 @@ export const useAssistantStore = defineStore('assistant', () => {
     }
   }
   async function send(text: string) {
+    if (import.meta.env.VITE_PUBLIC_DEMO === 'true') return
     if (pending.value || !text.trim()) return
     error.value = ''
     recommendations.value = []
@@ -89,11 +114,14 @@ export const useAssistantStore = defineStore('assistant', () => {
     pending.value = true
     controller = new AbortController()
     const timeout = setTimeout(() => controller?.abort('timeout'), 135000)
-    const exactFigures = /exact|figures|amounts|dokład|doklad|kwot|точн|сумм/i.test(message.content)
+    const exactFigures = asksForFinancialAmounts(message.content)
+    const requestedPeriod = period.value
+    const auth = useAuthStore()
+    const ownerId = auth.user?.id
     try {
-      if (useAuthStore().user) {
-        const snapshot = await requestSnapshot(period.value, controller.signal)
-        if (controller.signal.aborted) return
+      if (ownerId !== undefined) {
+        const snapshot = await requestSnapshot(requestedPeriod, controller.signal)
+        if (controller.signal.aborted || auth.user?.id !== ownerId) return
         serverSnapshot.value = snapshot
         lastContext.value = snapshot.context
         if (exactFigures) {
@@ -102,11 +130,11 @@ export const useAssistantStore = defineStore('assistant', () => {
         }
         const result = await requestAccountAnswer(
           messages.value,
-          period.value,
+          requestedPeriod,
           language.value,
           controller.signal,
         )
-        if (controller.signal.aborted) return
+        if (controller.signal.aborted || auth.user?.id !== ownerId) return
         recommendations.value = result.recommendations ?? []
         lastContext.value = result.snapshot.context
         serverSnapshot.value = result.snapshot
@@ -123,7 +151,7 @@ export const useAssistantStore = defineStore('assistant', () => {
       const context = businessContext(
         useFinanceStore().transactions,
         useCustomersStore().customers,
-        period.value,
+        requestedPeriod,
       )
       lastContext.value = context
       if (exactFigures) {
@@ -140,6 +168,7 @@ export const useAssistantStore = defineStore('assistant', () => {
       messages.value.push({ role: 'assistant', content })
       connection.value.status = 'ready'
     } catch (cause) {
+      if (ownerId !== undefined && auth.user?.id !== ownerId) return
       error.value = controller.signal.aborted
         ? controller.signal.reason === 'timeout'
           ? 'Local inference timed out before completing a final answer. Please retry.'
@@ -168,6 +197,7 @@ export const useAssistantStore = defineStore('assistant', () => {
     period,
     lastContext,
     serverSnapshot,
+    periodLabel,
     send,
     cancel,
     clear,

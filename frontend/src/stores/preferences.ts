@@ -1,3 +1,4 @@
+import { storageKey } from '@/demo/config'
 import { i18n, tr, type Language } from '@/i18n'
 import { defineStore } from 'pinia'
 import { api } from '@/services/http'
@@ -23,7 +24,7 @@ const defaults: Preferences = {
 }
 function load(): Preferences {
   try {
-    const value = JSON.parse(localStorage.getItem('nexora_preferences') ?? '{}')
+    const value = JSON.parse(localStorage.getItem(storageKey('nexora_preferences')) ?? '{}')
     return {
       language: ['en', 'pl', 'ru'].includes(value.language) ? value.language : 'en',
       name:
@@ -72,7 +73,7 @@ export const usePreferencesStore = defineStore('preferences', () => {
       document.documentElement.lang = value.language ?? 'en'
       if (accountMode.value) return
       try {
-        localStorage.setItem('nexora_preferences', JSON.stringify(value))
+        localStorage.setItem(storageKey('nexora_preferences'), JSON.stringify(value))
         error.value = ''
       } catch {
         error.value = 'Preferences could not be saved. Browser storage may be full or disabled.'

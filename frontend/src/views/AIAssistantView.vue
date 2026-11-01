@@ -1,4 +1,6 @@
 <script setup lang="ts">
+import { isPublicDemo } from '@/demo/config'
+const publicDemo = isPublicDemo()
 import { t, tr } from '@/i18n'
 import { computed, nextTick, onMounted, onUnmounted, ref, watch } from 'vue'
 import { useAssistantStore } from '@/stores/assistant'
@@ -63,7 +65,8 @@ onUnmounted(() => assistant.cancel())
         {{ t('local_read_only_business_analysis_no_customer_na_a2356') }}
       </p>
     </header>
-    <div class="panel flex flex-wrap items-center gap-4">
+    <p v-if="publicDemo" role="status" class="panel text-amber-200">{{ t('public_demo_ai') }}</p>
+    <div v-if="!publicDemo" class="panel flex flex-wrap items-center gap-4">
       <p
         role="status"
         :class="assistant.connection.status === 'ready' ? 'text-green-400' : 'text-amber-300'"
@@ -108,9 +111,9 @@ onUnmounted(() => assistant.cancel())
             : tr('Local demo calculations')
         }}</span>
       </div>
+      <p class="text-sm text-gray-400">{{ assistant.periodLabel }} · EUR</p>
       <p class="text-sm text-gray-400">
-        {{ formatDate(assistant.lastContext.selected.start) }} —
-        {{ formatDate(assistant.lastContext.selected.end) }} · EUR
+        {{ t('assistant_period_scope') }}
       </p>
       <div class="grid gap-3 sm:grid-cols-3">
         <div
@@ -237,7 +240,7 @@ onUnmounted(() => assistant.cancel())
       <p v-if="assistant.error" role="alert" class="mt-4 text-red-300">{{ tr(assistant.error) }}</p>
       <div class="my-5 flex flex-wrap gap-2">
         <button
-          v-for="suggestion in suggestions"
+          v-for="suggestion in publicDemo ? [] : suggestions"
           :key="suggestion"
           class="button-secondary text-sm"
           :disabled="assistant.pending"
@@ -246,7 +249,7 @@ onUnmounted(() => assistant.cancel())
           {{ suggestion }}
         </button>
       </div>
-      <form class="flex flex-col gap-3 sm:flex-row" @submit.prevent="send()">
+      <form v-if="!publicDemo" class="flex flex-col gap-3 sm:flex-row" @submit.prevent="send()">
         <label class="flex-1"
           ><span class="sr-only">{{ t('your_question_35251') }}</span
           ><textarea

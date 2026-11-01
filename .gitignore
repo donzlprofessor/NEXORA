@@ -19,6 +19,9 @@
 local-data/
 backups/
 
+!frontend/.env.public-demo
+**/dist-demo/
+
 # Private keys and local credential stores
 **/.aws/
 **/.ssh/

@@ -13,7 +13,10 @@
     "lint": "run-s \"lint:*\"",
     "lint:oxlint": "oxlint . --fix",
     "lint:eslint": "eslint . --fix --cache",
-    "format": "prettier --write --experimental-cli src/"
+    "format": "prettier --write --experimental-cli src/",
+    "build:demo": "npm run type-check && vite build --mode public-demo --outDir dist-demo",
+    "dev:demo": "vite --mode public-demo",
+    "preview:demo": "vite preview --mode public-demo --outDir dist-demo"
   },
   "dependencies": {
     "@tailwindcss/vite": "^4.3.3",

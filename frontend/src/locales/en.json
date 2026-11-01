@@ -123,6 +123,8 @@
   "page_not_found_d0fbd": "Page not found",
   "password_dc647": "Password",
   "period_19016": "Period",
+  "assistant_selected_period": "Selected period: {days} calendar days, {start} to {end} ({zone})",
+  "assistant_period_scope": "These figures cover the selected period. Dashboard totals cover all time and may differ.",
   "preferences_and_records_for_your_authenticated_a_6e43f": "Preferences and records for your authenticated account.",
   "preview_existing_localstorage_0578b": "Preview existing localStorage",
   "preview_failed_browser_records_are_unchanged_73f80": "Preview failed; browser records are unchanged.",
@@ -333,5 +335,8 @@
   "api_message_18": "The local model returned an invalid final response. Please retry.",
   "api_message_19": "The local model returned internal reasoning without a final answer. Reasoning is hidden. Please retry.",
   "api_message_20": "The local model did not return a complete final answer. Please retry; verified figures remain available.",
-  "api_message_21": "The local model exhausted its generation budget before completing a final answer. Its internal reasoning is hidden; your question is not necessarily too long. Please retry."
+  "api_message_21": "The local model exhausted its generation budget before completing a final answer. Its internal reasoning is hidden; your question is not necessarily too long. Please retry.",
+  "public_demo_label": "Portfolio demo",
+  "public_demo_storage": "Fictional data. Changes stay in this browser and do not sync across devices. Clearing browser storage removes them. Do not enter sensitive information.",
+  "public_demo_ai": "Live AI requires the full local NEXORA setup: FastAPI and Ollama with qwen3:4b. This static demo does not contact an AI model or simulate answers. Explore Dashboard and Analytics for calculated figures."
 }

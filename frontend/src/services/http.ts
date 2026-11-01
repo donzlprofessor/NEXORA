@@ -16,6 +16,11 @@ export async function api<T>(
   body?: unknown,
   signal?: AbortSignal,
 ): Promise<T> {
+  if (import.meta.env.VITE_PUBLIC_DEMO === 'true')
+    throw new ApiError(
+      'Account access is disabled in the static public demo. Run the full stack locally.',
+      0,
+    )
   const requestCsrf = csrf
   const requestSignal = signal ?? AbortSignal.timeout(15000)
   const base = import.meta.env.VITE_API_BASE_URL || ''

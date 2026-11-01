@@ -1,3 +1,6 @@
+import { isPublicDemo } from '@/demo/config'
+import { portfolioData } from '@/demo/data'
+import { storageKey } from '@/demo/config'
 import { defineStore } from 'pinia'
 import { api } from '@/services/http'
 import { computed, nextTick, ref, watch } from 'vue'
@@ -44,13 +47,19 @@ export const defaultTransactions: Transaction[] = [
 
 function loadTransactions(): Transaction[] {
   try {
-    const saved = localStorage.getItem('nexora-transactions')
+    const saved = localStorage.getItem(storageKey('nexora-transactions'))
 
-    if (!saved) return defaultTransactions.map((t) => ({ ...t }))
+    if (!saved)
+      return isPublicDemo()
+        ? portfolioData().transactions
+        : defaultTransactions.map((t) => ({ ...t }))
 
     const parsed: unknown = JSON.parse(saved)
 
-    if (!Array.isArray(parsed)) return defaultTransactions.map((t) => ({ ...t }))
+    if (!Array.isArray(parsed))
+      return isPublicDemo()
+        ? portfolioData().transactions
+        : defaultTransactions.map((t) => ({ ...t }))
 
     return parsed.filter(
       (item): item is Transaction =>
@@ -67,13 +76,24 @@ function loadTransactions(): Transaction[] {
         typeof item.date === 'string',
     )
   } catch {
-    return defaultTransactions.map((t) => ({ ...t }))
+    return isPublicDemo()
+      ? portfolioData().transactions
+      : defaultTransactions.map((t) => ({ ...t }))
   }
 }
 
 export const useFinanceStore = defineStore('finance', () => {
   const transactions = ref<Transaction[]>(loadTransactions())
   const storageError = ref('')
+  if (isPublicDemo()) {
+    try {
+      if (localStorage.getItem(storageKey('nexora-transactions')) === null)
+        localStorage.setItem(storageKey('nexora-transactions'), JSON.stringify(transactions.value))
+    } catch {
+      storageError.value =
+        'Transactions could not be saved. Export your data before closing this tab.'
+    }
+  }
   const accountMode = ref(false)
   let accountEpoch = 0
   async function setAccountData(records: Transaction[] | null) {
@@ -130,7 +150,7 @@ export const useFinanceStore = defineStore('finance', () => {
     (value) => {
       if (accountMode.value) return
       try {
-        localStorage.setItem('nexora-transactions', JSON.stringify(value))
+        localStorage.setItem(storageKey('nexora-transactions'), JSON.stringify(value))
         storageError.value = ''
       } catch {
         storageError.value =

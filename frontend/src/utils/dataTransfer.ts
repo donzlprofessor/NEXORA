@@ -1,3 +1,4 @@
+import { storageKey } from '@/demo/config'
 import type { Customer } from '@/stores/customers'
 import type { Transaction } from '@/stores/finance'
 import { customerError } from './customers'
@@ -119,21 +120,21 @@ export function downloadJson(value: unknown, filename: string) {
 
 // Save a full raw backup first. If any write fails, restore both original values.
 export function persistBundle(bundle: DataBundle, storage: Storage = localStorage): string {
-  const oldCustomers = storage.getItem('nexora_customers')
-  const oldTransactions = storage.getItem('nexora-transactions')
-  const backupKey = `nexora_backup_${Date.now()}_${crypto.randomUUID()}`
+  const oldCustomers = storage.getItem(storageKey('nexora_customers'))
+  const oldTransactions = storage.getItem(storageKey('nexora-transactions'))
+  const backupKey = storageKey(`nexora_backup_${Date.now()}_${crypto.randomUUID()}`)
   storage.setItem(
     backupKey,
     JSON.stringify({ customers: oldCustomers, transactions: oldTransactions }),
   )
   try {
-    storage.setItem('nexora_customers', JSON.stringify(bundle.customers))
-    storage.setItem('nexora-transactions', JSON.stringify(bundle.transactions))
+    storage.setItem(storageKey('nexora_customers'), JSON.stringify(bundle.customers))
+    storage.setItem(storageKey('nexora-transactions'), JSON.stringify(bundle.transactions))
   } catch (error) {
-    if (oldCustomers === null) storage.removeItem('nexora_customers')
-    else storage.setItem('nexora_customers', oldCustomers)
-    if (oldTransactions === null) storage.removeItem('nexora-transactions')
-    else storage.setItem('nexora-transactions', oldTransactions)
+    if (oldCustomers === null) storage.removeItem(storageKey('nexora_customers'))
+    else storage.setItem(storageKey('nexora_customers'), oldCustomers)
+    if (oldTransactions === null) storage.removeItem(storageKey('nexora-transactions'))
+    else storage.setItem(storageKey('nexora-transactions'), oldTransactions)
     throw error
   }
   return backupKey

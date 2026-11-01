@@ -123,6 +123,8 @@
   "page_not_found_d0fbd": "Nie znaleziono strony",
   "password_dc647": "Hasło",
   "period_19016": "Okres",
+  "assistant_selected_period": "Wybrany okres: {days} dni kalendarzowych, od {start} do {end} ({zone})",
+  "assistant_period_scope": "Te kwoty dotyczą wybranego okresu. Panel pokazuje sumy za cały czas, które mogą być inne.",
   "preferences_and_records_for_your_authenticated_a_6e43f": "Ustawienia i dane Twojego uwierzytelnionego konta.",
   "preview_existing_localstorage_0578b": "Podgląd danych z przeglądarki",
   "preview_failed_browser_records_are_unchanged_73f80": "Podgląd nie powiódł się. Dane przeglądarki nie zostały zmienione.",
@@ -333,5 +335,8 @@
   "api_message_18": "Lokalny model zwrócił nieprawidłową odpowiedź końcową. Spróbuj ponownie.",
   "api_message_19": "Lokalny model zwrócił wyłącznie wewnętrzne rozumowanie, które zostało ukryte. Spróbuj ponownie.",
   "api_message_20": "Lokalny model nie zwrócił pełnej odpowiedzi końcowej. Spróbuj ponownie. Zweryfikowane dane pozostają dostępne.",
-  "api_message_21": "Model osiągnął limit generowania przed ukończeniem odpowiedzi. Wewnętrzne rozumowanie jest ukryte. Spróbuj ponownie — pytanie nie musi być zbyt długie."
+  "api_message_21": "Model osiągnął limit generowania przed ukończeniem odpowiedzi. Wewnętrzne rozumowanie jest ukryte. Spróbuj ponownie — pytanie nie musi być zbyt długie.",
+  "public_demo_label": "Demo portfolio",
+  "public_demo_storage": "Dane fikcyjne. Zmiany pozostają tylko w tej przeglądarce i nie synchronizują się między urządzeniami. Mogą zniknąć po wyczyszczeniu lub zablokowaniu pamięci przeglądarki. Nie wpisuj danych poufnych.",
+  "public_demo_ai": "AI wymaga pełnej lokalnej instalacji NEXORA: FastAPI i Ollama z qwen3:4b. To statyczne demo nie łączy się z modelem AI ani nie symuluje odpowiedzi. Obliczone dane znajdziesz w panelu i analityce."
 }

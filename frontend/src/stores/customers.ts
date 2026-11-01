@@ -1,3 +1,6 @@
+import { isPublicDemo } from '@/demo/config'
+import { portfolioData } from '@/demo/data'
+import { storageKey } from '@/demo/config'
 import { defineStore } from 'pinia'
 import { api } from '@/services/http'
 import { computed, nextTick, ref, watch } from 'vue'
@@ -74,7 +77,7 @@ function isCustomer(value: unknown): value is Customer {
 }
 function loadCustomers(): Customer[] {
   try {
-    const saved = localStorage.getItem(STORAGE_KEY)
+    const saved = localStorage.getItem(storageKey(STORAGE_KEY))
     if (saved !== null) {
       const parsed: unknown = JSON.parse(saved)
       if (Array.isArray(parsed)) return parsed.filter(isCustomer)
@@ -82,11 +85,19 @@ function loadCustomers(): Customer[] {
   } catch (error) {
     console.error('Failed to load customers:', error)
   }
-  return demoCustomers.map((c) => ({ ...c }))
+  return isPublicDemo() ? portfolioData().customers : demoCustomers.map((c) => ({ ...c }))
 }
 export const useCustomersStore = defineStore('customers', () => {
   const customers = ref<Customer[]>(loadCustomers())
   const storageError = ref('')
+  if (isPublicDemo()) {
+    try {
+      if (localStorage.getItem(storageKey('nexora_customers')) === null)
+        localStorage.setItem(storageKey('nexora_customers'), JSON.stringify(customers.value))
+    } catch {
+      storageError.value = 'Customers could not be saved. Export your data before closing this tab.'
+    }
+  }
   const accountMode = ref(false)
   let accountEpoch = 0
   async function setAccountData(records: Customer[] | null) {
@@ -140,7 +151,7 @@ export const useCustomersStore = defineStore('customers', () => {
     (value) => {
       if (accountMode.value) return
       try {
-        localStorage.setItem(STORAGE_KEY, JSON.stringify(value))
+        localStorage.setItem(storageKey(STORAGE_KEY), JSON.stringify(value))
         storageError.value = ''
       } catch {
         storageError.value =

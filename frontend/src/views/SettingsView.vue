@@ -1,4 +1,7 @@
 <script setup lang="ts">
+import { portfolioData } from '@/demo/data'
+import { isPublicDemo } from '@/demo/config'
+const publicDemo = isPublicDemo()
 import { t, tr } from '@/i18n'
 import LanguageSelector from '@/components/LanguageSelector.vue'
 import { useAuthStore } from '@/stores/auth'
@@ -90,8 +93,10 @@ function resetDemo() {
     apply({
       version: 1,
       currency: 'EUR',
-      customers: demoCustomers.map((c) => ({ ...c })),
-      transactions: defaultTransactions.map((t) => ({ ...t })),
+      customers: publicDemo ? portfolioData().customers : demoCustomers.map((c) => ({ ...c })),
+      transactions: publicDemo
+        ? portfolioData().transactions
+        : defaultTransactions.map((t) => ({ ...t })),
     })
     resetText.value = ''
     error.value = ''
@@ -129,9 +134,11 @@ onMounted(() => void assistant.checkConnection())
       <h1 class="text-4xl font-bold">{{ t('settings_f4f70') }}</h1>
       <p class="mt-3 text-gray-400">
         {{
-          auth.user
-            ? t('preferences_and_records_for_your_authenticated_a_6e43f')
-            : t('local_demo_preferences_for_this_browser_sign_in__10bc2')
+          publicDemo
+            ? t('public_demo_storage')
+            : auth.user
+              ? t('preferences_and_records_for_your_authenticated_a_6e43f')
+              : t('local_demo_preferences_for_this_browser_sign_in__10bc2')
         }}
       </p>
     </header>

@@ -1,4 +1,6 @@
 <script setup lang="ts">
+import { isPublicDemo } from '@/demo/config'
+const publicDemo = isPublicDemo()
 import { t, tr } from '@/i18n'
 import LanguageSelector from '@/components/LanguageSelector.vue'
 import { computed } from 'vue'
@@ -43,14 +45,21 @@ const storageError = computed(() =>
               : t('local_demo_browser_records_only_1700c')
           }}
         </p>
-        <RouterLink v-if="!auth.user" to="/login" class="text-purple-300">{{
+        <RouterLink v-if="!publicDemo && !auth.user" to="/login" class="text-purple-300">{{
           t('sign_in_register_f3f54')
         }}</RouterLink>
-        <RouterLink v-else to="/account" class="text-purple-300">{{
+        <RouterLink v-else-if="auth.user" to="/account" class="text-purple-300">{{
           t('account_and_migration_0eea0')
         }}</RouterLink>
       </div>
       <p v-if="auth.error" role="alert" class="mb-4 text-amber-300">{{ tr(auth.error) }}</p>
+      <p
+        v-if="publicDemo"
+        role="status"
+        class="mb-5 rounded-xl border border-purple-400/30 bg-purple-500/10 p-4 text-sm text-purple-200"
+      >
+        <strong>{{ t('public_demo_label') }}</strong> {{ t('public_demo_storage') }}
+      </p>
       <LanguageSelector class="mb-5" />
       <RouterView />
     </main>

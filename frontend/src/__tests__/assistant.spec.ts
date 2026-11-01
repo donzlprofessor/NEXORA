@@ -2,7 +2,13 @@ import { afterEach, beforeEach, expect, it, vi } from 'vitest'
 import { createPinia, setActivePinia } from 'pinia'
 import { useAssistantStore } from '@/stores/assistant'
 import { useFinanceStore } from '@/stores/finance'
-import { requestAnswer, requestSnapshot, requestAccountAnswer } from '@/services/ai'
+import {
+  businessContext,
+  requestAnswer,
+  requestSnapshot,
+  requestAccountAnswer,
+  type ServerSnapshot,
+} from '@/services/ai'
 import { useAuthStore } from '@/stores/auth'
 import { usePreferencesStore } from '@/stores/preferences'
 import { mount } from '@vue/test-utils'
@@ -14,6 +20,99 @@ vi.mock('@/services/ai', async (importOriginal) => ({
   requestSnapshot: vi.fn<typeof requestSnapshot>(),
   requestAccountAnswer: vi.fn<typeof requestAccountAnswer>(),
 }))
+
+function accountSnapshot(period: '7D' | '30D' | '90D'): ServerSnapshot {
+  const context = businessContext([], [], period)
+  return {
+    context: {
+      ...context,
+      allTime: { totalIncome: 900, totalExpenses: 70, netProfit: 830 },
+      selected: { ...context.selected, totalIncome: 111, totalExpenses: 111, netProfit: 0 },
+    },
+    // Authoritative cent fields deliberately disagree with legacy and all-time totals.
+    metrics: {
+      revenueCents: '62540',
+      expenseCents: '3120',
+      netProfitCents: '59420',
+      transactionCount: 3,
+      incomeCount: 2,
+      expenseCount: 1,
+    },
+    previousPeriod: {
+      start: '2026-09-01',
+      end: '2026-09-30',
+      totalIncome: 0,
+      totalExpenses: 0,
+      netProfit: 0,
+    },
+    expenseCategories: [],
+    timezone: 'Europe/Warsaw',
+  }
+}
+
+it.each(['7D', '30D', '90D'] as const)(
+  'answers the reported Polish question from authenticated %s cents without Ollama',
+  async (period) => {
+    vi.useFakeTimers()
+    vi.setSystemTime(new Date(2026, 10, 1, 12))
+    useAuthStore().user = { id: 17, email: 'owner@example.com', name: 'Owner', csrf: 'test' }
+    await usePreferencesStore().setLanguage('pl')
+    const snapshot = accountSnapshot(period)
+    vi.mocked(requestSnapshot).mockResolvedValue(snapshot)
+    vi.mocked(requestAccountAnswer).mockRejectedValue(new Error('Ollama offline'))
+    const store = useAssistantStore()
+    store.period = period
+    await store.send('Ile wynoszą moje przychody, wydatki i zysk netto?')
+    expect(requestSnapshot).toHaveBeenCalledWith(period, expect.any(AbortSignal))
+    expect(requestAccountAnswer).not.toHaveBeenCalled()
+    expect(requestAnswer).not.toHaveBeenCalled()
+    const reply = store.messages[1]!.content
+    expect(reply).toContain('Przychody: 625,40')
+    expect(reply).toContain('Wydatki: 31,20')
+    expect(reply).toContain('Zysk netto: 594,20')
+    expect(reply).not.toMatch(/900|830|111,00/)
+    expect(reply).toContain(`Wybrany okres: ${Number.parseInt(period)} dni kalendarzowych`)
+    expect(reply).toContain(
+      `od ${snapshot.context.selected.start} do ${snapshot.context.selected.end} (Europe/Warsaw)`,
+    )
+    expect(reply).not.toMatch(/NaN|undefined|Invalid Date|\{\w+\}/)
+    expect(store.error).toBe('')
+    const wrapper = mount(AIAssistantView)
+    expect(wrapper.text()).toContain(store.periodLabel)
+    expect(wrapper.text()).toContain('Panel pokazuje sumy za cały czas')
+    expect(wrapper.text()).not.toMatch(/NaN|undefined|Invalid Date|\{\w+\}/)
+    wrapper.unmount()
+  },
+)
+
+it('keeps Polish qualitative questions on the Ollama route', async () => {
+  useAuthStore().user = { id: 17, email: 'owner@example.com', name: 'Owner', csrf: 'test' }
+  const snapshot = accountSnapshot('30D')
+  vi.mocked(requestSnapshot).mockResolvedValue(snapshot)
+  vi.mocked(requestAccountAnswer).mockResolvedValue({
+    content: 'Przejrzyj kategorie wydatków.',
+    snapshot,
+  })
+  const store = useAssistantStore()
+  await store.send('Jak mogę zwiększyć przychody i ograniczyć wydatki?')
+  expect(requestAccountAnswer).toHaveBeenCalledOnce()
+  expect(store.messages[1]!.content).toBe('Przejrzyj kategorie wydatków.')
+})
+
+it('discards an authenticated snapshot if the account changes while loading', async () => {
+  const auth = useAuthStore()
+  auth.user = { id: 17, email: 'owner@example.com', name: 'Owner', csrf: 'test' }
+  vi.mocked(requestSnapshot).mockImplementation(async () => {
+    auth.user = { id: 18, email: 'other@example.com', name: 'Other', csrf: 'other' }
+    return accountSnapshot('30D')
+  })
+  const store = useAssistantStore()
+  await store.send('Ile wynoszą moje przychody, wydatki i zysk netto?')
+  expect(store.messages).toHaveLength(1)
+  expect(store.serverSnapshot).toBeNull()
+  expect(store.lastContext).toBeNull()
+  expect(requestAccountAnswer).not.toHaveBeenCalled()
+})
 
 beforeEach(() => {
   setActivePinia(createPinia())

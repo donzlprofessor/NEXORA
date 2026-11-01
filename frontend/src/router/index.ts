@@ -48,6 +48,11 @@ const router = createRouter({
 })
 
 router.beforeEach(async (to) => {
+  if (
+    import.meta.env.VITE_PUBLIC_DEMO === 'true' &&
+    ['login', 'register', 'account'].includes(String(to.name))
+  )
+    return '/'
   const auth = useAuthStore()
   await auth.restore()
   if (to.meta.requiresAccount && !auth.user) return { name: 'login' }

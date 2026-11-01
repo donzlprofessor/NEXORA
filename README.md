@@ -6,9 +6,41 @@ A local-first, full-stack business dashboard and read-only AI analyst built with
 
 - **Local demo:** existing browser records and workflows continue to work without a database. Nothing is automatically imported.
 - **Authenticated account:** database-backed customer/finance CRUD, persistent preferences, server-derived AI metrics, session restoration and confirmed legacy-data import. Account records never overwrite browser demo storage.
-- **Public static showcase:** `VITE_PUBLIC_DEMO=true` disables account/inference calls. A public account backend can independently set `AI_MODE=disabled`; no developer-private Ollama connection is attempted.
+- **Public portfolio demo:** the isolated Vite `public-demo` mode needs no backend, account or paid API. It blocks account/inference calls and uses separate browser storage for fictional records. The full local application remains available with the normal commands below.
 
 Features include search, filters, sorting, pagination, responsive navigation, accessible dialogs, accurate financial/date metrics, JSON backups, separate customer lifetime spending, qualitative AI explanations and explicit data-completeness notices. Money is stored as integer cents in PostgreSQL; EUR remains the underlying currency.
+
+## Public portfolio demo (static Cloudflare Pages)
+
+From `frontend`, with dependencies installed using `npm ci`:
+
+```powershell
+npm.cmd run dev:demo
+npm.cmd run build:demo
+npm.cmd run preview:demo
+```
+
+`build:demo` checks TypeScript and writes **frontend/dist-demo**. Normal `npm run build` still writes **frontend/dist**; these outputs are separate. The new tracked `.env.public-demo` contains only public flags. Vite also forces public-demo network flags at configuration time, so a shell API URL cannot enable backend requests in this mode. Do not add credentials to any `VITE_*` variable: these are public bundle content.
+
+Visitors enter Dashboard immediately and can use Analytics, Customers, Finance and Settings without signing up. Fictional seed dates are relative to the first visit and then persisted. Seed customer spending matches linked income; after editing, lifetime spending remains an independently editable field, while financial charts use transaction records. Data and language/theme preferences persist only in the current browser/origin under `nexora_public_v1_*`. Existing full-mode browser keys are never imported or overwritten. Storage restrictions or quota failures can prevent persistence; the app reports storage errors. Export records from Settings for a portable backup. Avoid entering sensitive information on a public showcase.
+
+The localized demo banner explains this boundary in English, Polish and Russian. AI Assistant explains that live AI needs local FastAPI and Ollama (`qwen3:4b`); it does not generate simulated answers. The normal local AI integration is preserved.
+
+Cloudflare Pages settings (prepare only; this task does not deploy):
+
+| Setting | Value |
+| --- | --- |
+| Project type | Pages, static Vue/Vite site |
+| Root directory | `frontend` |
+| Build command | `npm run build:demo` |
+| Build output directory | `dist-demo` |
+| Branch, when explicitly authorized | `portfolio-demo` |
+| Node | A supported Node 24 LTS version, at least 24.12.0 |
+| Backend, database, bindings, API keys | None |
+
+Publish only `dist-demo`, never the repository or normal `dist`. `public/_redirects` is copied to the output and rewrites `/*` to `/index.html` with status 200 for Vue history routing. See Cloudflare's [build settings](https://developers.cloudflare.com/pages/configuration/build-configuration/) and [redirects](https://developers.cloudflare.com/pages/configuration/redirects/). Preview deep links such as `/customers` and `/settings` after hosting. Cloudflare deployment, domain configuration and browser/mobile acceptance still require manual verification.
+
+For the full application use `npm run dev` / `npm run build` and the FastAPI, PostgreSQL and optional Ollama setup below. Do not set `VITE_PUBLIC_DEMO=true` in full-mode environment files or the shell. Existing environment files, migrations, Docker volumes and account data are untouched by the portfolio implementation.
 
 ## Verification status
 
