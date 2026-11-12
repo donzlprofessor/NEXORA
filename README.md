@@ -57,10 +57,16 @@ Public-demo mode blocks backend requests and uses a separate `nexora_public_v1_*
 
 ## Screenshots
 
-Screenshots are not yet included. The live demo is available for a walkthrough.
+The screenshots below show NEXORA running locally with fictional portfolio data. The public demo runs independently without a backend or local AI model.
 
-<!-- TODO: Add a Dashboard screenshot using fictional records, then link to the actual relative file path. -->
-<!-- TODO: Add Customers, Finance and mobile-layout screenshots; never include private account data. -->
+### Dashboard
+![NEXORA Dashboard](docs/screenshots/dashboard.png)
+
+### Analytics
+![NEXORA Analytics](docs/screenshots/analytics.png)
+
+### AI Assistant
+![NEXORA AI Assistant](docs/screenshots/ai-assistant.png)
 
 ## Run locally
 
