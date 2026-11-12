@@ -125,8 +125,9 @@ class GatewayTests(unittest.TestCase):
         self.assertEqual(len(self.requests), 2)
         for request in self.requests:
             self.assertTrue(request["think"])
-            self.assertEqual(request["options"]["num_predict"], 4096)
+            self.assertEqual(request["options"]["num_predict"], 6144)
             self.assertIn('"netProfit": 80.0', request["messages"][0]["content"])
+            self.assertNotIn(main.ACCOUNT_ENGLISH_EXPLANATION, request["messages"][0]["content"])
         self.assertNotIn("private trace", response.text)
         self.assertNotIn("thinking", response.json())
 

@@ -20,6 +20,7 @@ from accounts import router as account_router, current_session, account_snapshot
 from database import get_db
 from sqlalchemy.exc import SQLAlchemyError
 from financial_answer import asks_exact_figures, contradicts_snapshot, financial_answer
+from account_analysis import reporting_period, valid_english_explanation, english_analysis
 OLLAMA_URL = os.getenv("OLLAMA_URL", "http://127.0.0.1:11434").rstrip("/")
 MODEL = os.getenv("OLLAMA_MODEL", "qwen3:4b")
 if MODEL != "qwen3:4b":
@@ -119,6 +120,15 @@ Verified snapshot (EUR, local calendar days including today):
 
 ANSWER_SCHEMA = {"type": "object", "properties": {"answer": {"type": "string", "minLength": 1, "maxLength": 1600, "pattern": "^[^0-9<>]*$"}}, "required": ["answer"], "additionalProperties": False}
 
+ACCOUNT_ENGLISH_EXPLANATION = """The application already supplies the reporting window, exact financial figures, comparisons and practical improvements deterministically.
+Your answer is only an optional brief English explanation. Write at most two short sentences using English and Latin letters only.
+Focus exclusively on recorded revenue, recorded expenses, profitability, checking ledger completeness or reviewing expense categories.
+Do not repeat the reporting window or mention days, weeks, months or years.
+Do not write any number words (including zero, one, two or three), currency amounts, percentages or digits.
+Do not discuss customers, customer acquisition, deliveries, products, recurring charges, fixed costs, pricing or forecasts, even as suggestions.
+Do not say figures or financial data are unavailable; the application supplies them.
+Return only the required JSON answer field. Never include thinking or reasoning in that field."""
+
 
 class IncompleteAnswer(HTTPException):
     """Retryable generation failures; no model content is included in the error."""
@@ -186,7 +196,7 @@ async def health():
         return {"status": "ollama_offline", "model": MODEL}
 
 
-async def generate(body: ChatRequest) -> str:
+async def generate(body: ChatRequest, *, account: bool = False) -> str:
     try:
         async with httpx.AsyncClient(timeout=TIMEOUT, trust_env=False) as client:
             status = await model_status(client)
@@ -197,8 +207,11 @@ async def generate(body: ChatRequest) -> str:
             metadata = details.json()
             thinking = thinking_options(metadata)
             system = SYSTEM.format(language={"en": "English", "pl": "professional Polish (przychody, wydatki, zysk netto)", "ru": "natural Russian"}[body.language], context=json.dumps(body.context.model_dump(), ensure_ascii=False))
+            if account and body.language == "en":
+                system += "\n" + ACCOUNT_ENGLISH_EXPLANATION
             # Both attempts share one wall-clock deadline and fixed token budgets.
-            # A thinking-only model needs room for reasoning AND its final response.
+            # The installed qwen3:4b can spend all 4096 tokens on reasoning alone.
+            # Reserve more room for a final response; the outer deadline still bounds latency.
             # Retry once with only the latest question and the SAME verified snapshot.
             for attempt in range(2):
                 messages = body.messages if attempt == 0 else body.messages[-1:]
@@ -206,7 +219,7 @@ async def generate(body: ChatRequest) -> str:
                 response = await client.post(f"{OLLAMA_URL}/api/chat", json={
                     "model": MODEL, "stream": False, "format": ANSWER_SCHEMA, **thinking,
                     "messages": [{"role": "system", "content": instruction}] + [m.model_dump() for m in messages],
-                    "options": {"temperature": 0, "num_ctx": 8192, "num_predict": 4096 if thinking.get("think") is True else 768},
+                    "options": {"temperature": 0, "num_ctx": 8192, "num_predict": 6144 if thinking.get("think") is True else 768},
                     "keep_alive": "5m",
                 })
                 response.raise_for_status()
@@ -235,7 +248,7 @@ async def chat(body: ChatRequest, request: Request):
         raise HTTPException(422, "Conversation context is too long. Start a shorter conversation.")
     if asks_exact_figures(body.messages[-1].content):
         return {"content": financial_answer(body.context.model_dump(), body.language), "model": MODEL}
-    task = asyncio.create_task(generate(body))
+    task = asyncio.create_task(generate(body, account=request.url.path == "/api/account/chat"))
     try:
         # Closing the browser request cancels the upstream HTTP request as well.
         async with asyncio.timeout(TIMEOUT):
@@ -273,17 +286,28 @@ async def account_chat(body: AccountChatRequest, request: Request, session=Depen
         end = date.fromisoformat(body.end) if body.end else None
     except ValueError:
         raise HTTPException(422, "Invalid end date")
-    metrics = account_snapshot(body.period, end, body.zone, session, db)
+    # Resolve the latest request before computing any totals, including direct API callers.
+    period = reporting_period(body.messages[-1].content, body.period)
+    metrics = account_snapshot(period, end, body.zone, session, db)
     context = {**metrics["context"], "previousPeriod": metrics["previousPeriod"], "expenseCategories": metrics["expenseCategories"][:12], "expenseCategoryCount": len(metrics["expenseCategories"]), "availability": metrics["availability"]}
     from financial_advice import recommendations
     advice = recommendations(metrics, body.language)
+    exact = asks_exact_figures(body.messages[-1].content)
     try:
         answer = await chat(ChatRequest(messages=body.messages, language=body.language, context=BusinessContext(**context)), request)
-        if asks_exact_figures(body.messages[-1].content) or contradicts_snapshot(answer["content"]):
+        if body.language == "en" and not exact:
+            answer["content"] = clean_answer(answer["content"])
+            if not valid_english_explanation(answer["content"]) or contradicts_snapshot(answer["content"]):
+                raise HTTPException(502, {"code": "invalid_response", "message": "Invalid English explanation"})
+        if exact or contradicts_snapshot(answer["content"]):
             answer["content"] = financial_answer(context, body.language, metrics["metrics"])
     except HTTPException as error:
         if error.status_code not in {502, 503, 504}:
             raise
         code = error.detail.get("code", "unavailable") if isinstance(error.detail, dict) else "unavailable"
-        return {"content": "", "model": MODEL, "snapshot": metrics, "explanation": None, "recommendations": advice, "aiStatus": code}
-    return {**answer, "snapshot": metrics, "explanation": answer["content"], "recommendations": advice, "aiStatus": "ready"}
+        fallback = english_analysis(metrics, advice, fallback=True) if body.language == "en" else ""
+        return {"content": fallback, "model": MODEL, "snapshot": metrics, "explanation": None, "recommendations": advice, "aiStatus": code}
+    explanation = answer["content"]
+    if body.language == "en":
+        answer["content"] = english_analysis(metrics, advice, explanation=None if exact else explanation)
+    return {**answer, "snapshot": metrics, "explanation": explanation, "recommendations": advice, "aiStatus": "ready"}

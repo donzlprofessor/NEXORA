@@ -27,6 +27,15 @@ function asksForFinancialAmounts(text: string) {
   return explicit || (polishAmount && financial)
 }
 
+function requestedReportingPeriod(text: string, selected: Period): Period {
+  const days = new Set(
+    Array.from(text.matchAll(/\b(?:last|past)\s+(7|30|90)(?:\s+|-)days?\b/gi), (match) => match[1]),
+  )
+  // Leave ambiguous comparisons and requests without a supported window to the selector.
+  if (days.size !== 1) return selected
+  return `${days.values().next().value}D` as Period
+}
+
 export const useAssistantStore = defineStore('assistant', () => {
   const messages = ref<ChatMessage[]>([])
   const recommendations = ref<string[]>([])
@@ -115,7 +124,8 @@ export const useAssistantStore = defineStore('assistant', () => {
     controller = new AbortController()
     const timeout = setTimeout(() => controller?.abort('timeout'), 135000)
     const exactFigures = asksForFinancialAmounts(message.content)
-    const requestedPeriod = period.value
+    const requestedPeriod = requestedReportingPeriod(message.content, period.value)
+    period.value = requestedPeriod
     const auth = useAuthStore()
     const ownerId = auth.user?.id
     try {
@@ -140,7 +150,7 @@ export const useAssistantStore = defineStore('assistant', () => {
         serverSnapshot.value = result.snapshot
         if (result.aiStatus && result.aiStatus !== 'ready') {
           error.value = 'AI explanation unavailable. Verified financial figures remain available.'
-          messages.value.push({ role: 'assistant', content: financialReply() })
+          messages.value.push({ role: 'assistant', content: result.content || financialReply() })
           void checkConnection()
           return
         }

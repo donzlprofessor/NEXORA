@@ -51,6 +51,94 @@ function accountSnapshot(period: '7D' | '30D' | '90D'): ServerSnapshot {
 }
 
 it.each(['7D', '30D', '90D'] as const)(
+  'uses an explicit %s request for both the authenticated snapshot and explanation',
+  async (period) => {
+    useAuthStore().user = { id: 17, email: 'owner@example.com', name: 'Owner', csrf: 'test' }
+    const snapshot = accountSnapshot(period)
+    vi.mocked(requestSnapshot).mockResolvedValue(snapshot)
+    vi.mocked(requestAccountAnswer).mockResolvedValue({
+      content: 'Review recorded costs.',
+      snapshot,
+    })
+    const store = useAssistantStore()
+    store.period = period === '90D' ? '30D' : '90D'
+    await store.send(
+      `Analyze my business performance over the last ${Number.parseInt(period)} days. Summarize revenue, expenses, net profit, and suggest three practical improvements.`,
+    )
+    expect(requestSnapshot).toHaveBeenCalledWith(period, expect.any(AbortSignal))
+    expect(requestAccountAnswer).toHaveBeenCalledWith(
+      expect.any(Array),
+      period,
+      'en',
+      expect.any(AbortSignal),
+    )
+    expect(store.period).toBe(period)
+    expect(store.lastContext?.selected.period).toBe(period)
+    expect(store.serverSnapshot?.metrics?.netProfitCents).toBe('59420')
+    expect(store.periodLabel).toContain(`${Number.parseInt(period)} calendar days`)
+    expect(requestAnswer).not.toHaveBeenCalled()
+  },
+)
+
+it('uses an explicit period for deterministic exact figures without inference', async () => {
+  useAuthStore().user = { id: 17, email: 'owner@example.com', name: 'Owner', csrf: 'test' }
+  vi.mocked(requestSnapshot).mockResolvedValue(accountSnapshot('90D'))
+  const store = useAssistantStore()
+  await store.send('Show exact revenue, expenses and net profit for the past 90 days.')
+  expect(requestSnapshot).toHaveBeenCalledWith('90D', expect.any(AbortSignal))
+  expect(requestAccountAnswer).not.toHaveBeenCalled()
+  expect(store.messages[1]!.content).toContain('594.20')
+  expect(store.lastContext?.selected.period).toBe('90D')
+})
+
+it('renders the complete backend fallback for the reported prompt instead of dropping its analysis', async () => {
+  useAuthStore().user = { id: 17, email: 'owner@example.com', name: 'Owner', csrf: 'test' }
+  const snapshot = accountSnapshot('90D')
+  const content =
+    'Reporting period: 90 calendar days\nRevenue: €625.40\nExpenses: €31.20\nNet profit: €594.20\nAI explanation unavailable or invalid.\nSuggested improvements:\n1. Review invoices.\n2. Reconcile statements.\n3. Check entry dates.'
+  vi.mocked(requestSnapshot).mockResolvedValue(snapshot)
+  vi.mocked(requestAccountAnswer).mockResolvedValue({
+    content,
+    snapshot,
+    aiStatus: 'invalid_response',
+    recommendations: ['Review invoices.', 'Reconcile statements.', 'Check entry dates.'],
+  })
+  const store = useAssistantStore()
+  store.period = '7D'
+  await store.send(
+    'Analyze my business performance over the last 90 days. Summarize revenue, expenses, net profit, and suggest three practical improvements.',
+  )
+  expect(requestSnapshot).toHaveBeenCalledWith('90D', expect.any(AbortSignal))
+  expect(store.messages[1]!.content).toBe(content)
+  expect(store.recommendations).toHaveLength(3)
+  expect(store.period).toBe('90D')
+  expect(store.error).toContain('Verified financial figures remain available')
+})
+
+it.each([
+  'Summarize business performance.',
+  'Analyze the last 60 days.',
+  'Compare the last 7 days with the last 90 days.',
+  'Review invoice 90 and suggest improvements.',
+])(
+  'preserves the selector for unspecified, unsupported or ambiguous periods: %s',
+  async (question) => {
+    useAuthStore().user = { id: 17, email: 'owner@example.com', name: 'Owner', csrf: 'test' }
+    const snapshot = accountSnapshot('7D')
+    vi.mocked(requestSnapshot).mockResolvedValue(snapshot)
+    vi.mocked(requestAccountAnswer).mockResolvedValue({
+      content: 'Review recorded costs.',
+      snapshot,
+    })
+    const store = useAssistantStore()
+    store.period = '7D'
+    await store.send(question)
+    expect(requestSnapshot).toHaveBeenCalledWith('7D', expect.any(AbortSignal))
+    expect(store.period).toBe('7D')
+  },
+)
+
+it.each(['7D', '30D', '90D'] as const)(
   'answers the reported Polish question from authenticated %s cents without Ollama',
   async (period) => {
     vi.useFakeTimers()
